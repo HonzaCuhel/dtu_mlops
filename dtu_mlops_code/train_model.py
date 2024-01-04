@@ -1,41 +1,47 @@
-import click
+# import click
 import torch
 from torch import nn
 from models import MyAwesomeModel
 import matplotlib.pyplot as plt
-
+import hydra
+import logging
+log = logging.getLogger(__name__)
+from hydra.utils import to_absolute_path
 from data import mnist
+import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-@click.group()
-def cli():
-    """Command line interface."""
-    pass
+# @click.group()
+# def cli():
+#     """Command line interface."""
+#     pass
 
 
-@click.command()
-@click.option("--lr", default=1e-3, help="learning rate to use for training")
-@click.option("--batch_size", default=256, help="batch size to use for training")
-@click.option("--num_epochs", default=10, help="number of epochs to train for")
-def train(lr, batch_size, num_epochs):
+# @click.command()
+# @click.option("--lr", default=1e-3, help="learning rate to use for training")
+# @click.option("--batch_size", default=256, help="batch size to use for training")
+# @click.option("--num_epochs", default=10, help="number of epochs to train for")
+# def train(lr, batch_size, num_epochs):
+@hydra.main(config_path="./conf", config_name="training_conf.yaml")
+def train(cfg):
     """Train a model on MNIST."""
-    print("Training day and night")
-    print(lr)
-    print(batch_size)
+    log.info("Training day and night")
+    log.info(str(cfg.hyperparameters.lr))
+    log.info(str(cfg.hyperparameters.batch_size))
 
     # TODO: Implement training loop here
     model = MyAwesomeModel().to(device)
     train_set, _ = mnist()
-    train_dataloader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
+    train_dataloader = torch.utils.data.DataLoader(train_set, batch_size=cfg.hyperparameters.batch_size, shuffle=True)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.hyperparameters.lr)
     loss_fn = nn.CrossEntropyLoss()
 
     losses = []  # Initialize the losses list
 
-    for epoch in range(num_epochs):
+    for epoch in range(cfg.hyperparameters.num_epochs):
         for batch in train_dataloader:
             optimizer.zero_grad()
             x, y = batch
@@ -45,24 +51,28 @@ def train(lr, batch_size, num_epochs):
             loss = loss_fn(y_pred, y)
             loss.backward()
             optimizer.step()
-        print(f"Epoch {epoch} Loss {loss}")
+        log.info(f"Epoch {epoch} Loss {loss}")
         losses.append(loss.item())  # Append the loss of this epoch to the losses list
 
-    torch.save(model, "./models/trained_model.pt")
+    checkpoint_file = f"{os.getcwd()}/trained_model.pt"
+    # torch.save(model, "./models/trained_model.pt")
+    torch.save(model, checkpoint_file)
     # Plot the losses
     plt.plot(losses)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Training Loss")
-    plt.savefig("./reports/figures/training_loss.png")
+    plt.savefig("training_loss.png")
+
+    evaluate(checkpoint_file)
 
 
-@click.command()
-@click.argument("model_checkpoint")
+# @click.command()
+# @click.argument("model_checkpoint")
 def evaluate(model_checkpoint):
     """Evaluate a trained model."""
-    print("Evaluating like my life dependends on it")
-    print(model_checkpoint)
+    log.info("Evaluating like my life dependends on it")
+    log.info(model_checkpoint)
 
     # TODO: Implement evaluation logic here
     model = torch.load(model_checkpoint)
@@ -84,12 +94,13 @@ def evaluate(model_checkpoint):
     test_preds = torch.cat(test_preds, dim=0)
     test_labels = torch.cat(test_labels, dim=0)
 
-    print((test_preds == test_labels).float().mean())
+    log.info(str((test_preds == test_labels).float().mean()))
 
 
-cli.add_command(train)
-cli.add_command(evaluate)
+# cli.add_command(train)
+# cli.add_command(evaluate)
 
 
 if __name__ == "__main__":
-    cli()
+    # cli()
+    train()

@@ -42,7 +42,8 @@ data: requirements
 
 ## Train the model
 train: requirements
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train_model.py train --lr 1e-4 --batch_size 64
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train_model.py
+## $(PYTHON_INTERPRETER) $(PROJECT_NAME)/train_model.py train --lr 1e-4 --batch_size 64
 
 ## Process raw data into processed data
 visualize:
