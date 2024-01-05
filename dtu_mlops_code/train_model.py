@@ -9,6 +9,10 @@ log = logging.getLogger(__name__)
 from hydra.utils import to_absolute_path
 from data import mnist
 import os
+import pytorch_lightning as pl
+from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks import ModelCheckpoint
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -32,69 +36,73 @@ def train(cfg):
     log.info(str(cfg.hyperparameters.batch_size))
 
     # TODO: Implement training loop here
-    model = MyAwesomeModel().to(device)
-    train_set, _ = mnist()
-    train_dataloader = torch.utils.data.DataLoader(train_set, batch_size=cfg.hyperparameters.batch_size, shuffle=True)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.hyperparameters.lr)
     loss_fn = nn.CrossEntropyLoss()
+    model = MyAwesomeModel(loss_fn).to(device)
+    train_set, test_set = mnist()
+    train_dataloader = torch.utils.data.DataLoader(train_set, batch_size=cfg.hyperparameters.batch_size, shuffle=True)
+    test_dataloader = torch.utils.data.DataLoader(test_set, batch_size=cfg.hyperparameters.batch_size, shuffle=False)
 
-    losses = []  # Initialize the losses list
+    # optimizer = torch.optim.Adam(model.parameters(), lr=cfg.hyperparameters.lr)
 
-    for epoch in range(cfg.hyperparameters.num_epochs):
-        for batch in train_dataloader:
-            optimizer.zero_grad()
-            x, y = batch
-            x = x.to(device)
-            y = y.to(device)
-            y_pred = model(x)
-            loss = loss_fn(y_pred, y)
-            loss.backward()
-            optimizer.step()
-        log.info(f"Epoch {epoch} Loss {loss}")
-        losses.append(loss.item())  # Append the loss of this epoch to the losses list
-
+    # losses = []  # Initialize the losses list
     checkpoint_file = f"{os.getcwd()}/trained_model.pt"
+
+    trainer = Trainer(logger=pl.loggers.WandbLogger(project="dtu_mlops"), max_epochs=cfg.hyperparameters.num_epochs)
+    trainer.fit(model, train_dataloader)
+    # for epoch in range(cfg.hyperparameters.num_epochs):
+    #     for batch in train_dataloader:
+    #         optimizer.zero_grad()
+    #         x, y = batch
+    #         x = x.to(device)
+    #         y = y.to(device)
+    #         y_pred = model(x)
+    #         loss = loss_fn(y_pred, y)
+    #         loss.backward()
+    #         optimizer.step()
+    #     log.info(f"Epoch {epoch} Loss {loss}")
+    #     losses.append(loss.item())  # Append the loss of this epoch to the losses list
+
     # torch.save(model, "./models/trained_model.pt")
     torch.save(model, checkpoint_file)
     # Plot the losses
-    plt.plot(losses)
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.title("Training Loss")
-    plt.savefig("training_loss.png")
-
-    evaluate(checkpoint_file)
+    # plt.plot(losses)
+    # plt.xlabel("Epoch")
+    # plt.ylabel("Loss")
+    # plt.title("Training Loss")
+    # plt.savefig("training_loss.png")
+    # Evaluate on the validation set
+    trainer.validate(model, test_dataloader)
+    # evaluate(checkpoint_file)
 
 
 # @click.command()
 # @click.argument("model_checkpoint")
-def evaluate(model_checkpoint):
-    """Evaluate a trained model."""
-    log.info("Evaluating like my life dependends on it")
-    log.info(model_checkpoint)
+# def evaluate(model_checkpoint):
+#     """Evaluate a trained model."""
+#     log.info("Evaluating like my life dependends on it")
+#     log.info(model_checkpoint)
 
-    # TODO: Implement evaluation logic here
-    model = torch.load(model_checkpoint)
-    _, test_set = mnist()
-    test_dataloader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=False)
-    model.eval()
+#     # TODO: Implement evaluation logic here
+#     model = torch.load(model_checkpoint)
+#     _, test_set = mnist()
+#     test_dataloader = torch.utils.data.DataLoader(test_set, batch_size=64, shuffle=False)
+#     model.eval()
 
-    test_preds = []
-    test_labels = []
-    with torch.no_grad():
-        for batch in test_dataloader:
-            x, y = batch
-            x = x.to(device)
-            y = y.to(device)
-            y_pred = model(x)
-            test_preds.append(y_pred.argmax(dim=1).cpu())
-            test_labels.append(y.cpu())
+#     test_preds = []
+#     test_labels = []
+#     with torch.no_grad():
+#         for batch in test_dataloader:
+#             x, y = batch
+#             x = x.to(device)
+#             y = y.to(device)
+#             y_pred = model(x)
+#             test_preds.append(y_pred.argmax(dim=1).cpu())
+#             test_labels.append(y.cpu())
 
-    test_preds = torch.cat(test_preds, dim=0)
-    test_labels = torch.cat(test_labels, dim=0)
+#     test_preds = torch.cat(test_preds, dim=0)
+#     test_labels = torch.cat(test_labels, dim=0)
 
-    log.info(str((test_preds == test_labels).float().mean()))
+#     log.info(str((test_preds == test_labels).float().mean()))
 
 
 # cli.add_command(train)
